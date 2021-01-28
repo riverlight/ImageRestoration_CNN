@@ -13,7 +13,7 @@ class IRDataset(Dataset):
 
     def __getitem__(self, idx):
         with h5py.File(self.h5_file, 'r') as f:
-            return f['source'][idx].astype(np.float32)/255, f['noise'][idx].astype(np.float32)/255
+            return f['noise'][idx].astype(np.float32)/255, f['source'][idx].astype(np.float32)/255
 
     def __len__(self):
         with h5py.File(self.h5_file, 'r') as f:
@@ -21,13 +21,15 @@ class IRDataset(Dataset):
 
 
 def test():
-    ds = IRDataset(".\\datasets\\1.h5")
+    ds = IRDataset(".\\datasets\\denoise-train.h5")
     dl = DataLoader(dataset=ds, batch_size=1)
     for data in dl:
-        source, noise = data
+        noise, source = data
         source = source.numpy()*255
         noise = noise.numpy()*255
-        cv2.imshow("a", noise[0, ...].astype(np.uint8))
+        source = source.transpose(0, 2, 3, 1)
+        noise = noise.transpose(0, 2, 3, 1)
+        cv2.imshow("a", source[0, ...].astype(np.uint8))
         cv2.waitKey(0)
         # break
 

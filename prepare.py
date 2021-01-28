@@ -13,21 +13,26 @@ def prepare(args):
     source_patchs = list()
 
     for count, image_file in enumerate(os.listdir(args.images_dir)):
+        if count < 6000:
+            continue
         print(image_file)
         source_img = cv2.imread(os.path.join(args.images_dir, image_file))
         # source_img = cv2.resize(source_img, (256, 256))
         ret, noise_buf = cv2.imencode(".JPG", source_img, [int(cv2.IMWRITE_JPEG_QUALITY), 10])
         noise_img = cv2.imdecode(noise_buf, 1)
+        source_img = source_img.transpose(2, 0, 1)
+        noise_img = noise_img.transpose(2, 0, 1)
+        # print(source_img.shape)
 
         # source_img = np.array(source_img)
         # noise_img = np.array(noise_img)
         # noise_ds.append(noise_img)
         # source_ds.append(source_img)
-        for i in range(0, source_img.shape[0] - args.patch_size + 1, args.stride):
-            for j in range(0, source_img.shape[1] - args.patch_size + 1, args.stride):
-                noise_patchs.append(source_img[i:i + args.patch_size, j:j + args.patch_size])
-                source_patchs.append(noise_img[i:i + args.patch_size, j:j + args.patch_size])
-        if count > 100 :
+        for i in range(0, source_img.shape[1] - args.patch_size + 1, args.stride):
+            for j in range(0, source_img.shape[2] - args.patch_size + 1, args.stride):
+                noise_patchs.append(noise_img[:, i:i + args.patch_size, j:j + args.patch_size])
+                source_patchs.append(source_img[:, i:i + args.patch_size, j:j + args.patch_size])
+        if count > 6010 :
             break
 
     noise_ds = np.array(noise_patchs, dtype=np.uint8)
