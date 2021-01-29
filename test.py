@@ -7,7 +7,7 @@ import numpy as np
 import PIL.Image as pil_image
 import cv2
 
-from models import IRCNN
+from models import IRCNN, IRResNet
 from utils import convert_rgb_to_ycbcr, convert_ycbcr_to_rgb, calc_psnr
 
 
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     cudnn.benchmark = True
     device = t.device('cuda:0' if t.cuda.is_available() else 'cpu')
 
-    model = IRCNN().to(device)
+    model = IRResNet(n_blocks=3).to(device)
 
     state_dict = model.state_dict()
     for n, p in t.load(args.weights_file, map_location=lambda storage, loc: storage).items():

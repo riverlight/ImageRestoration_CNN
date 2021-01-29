@@ -11,7 +11,7 @@ from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-from models import IRCNN
+from models import IRCNN, IRResNet
 from IR_dataset import IRDataset
 from utils import AverageMeter, calc_psnr
 
@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--num-epochs', type=int, default=400)
     parser.add_argument('--num-workers', type=int, default=8)
     parser.add_argument('--seed', type=int, default=123)
+    parser.add_argument('--best-weights', type=str, default=None)
     args = parser.parse_args()
 
     if not os.path.exists(args.outputs_dir):
@@ -40,7 +41,7 @@ def main():
     device = t.device('cuda:0' if t.cuda.is_available() else 'cpu')
     t.manual_seed(args.seed)
 
-    model = IRCNN().to(device)
+    model = IRResNet(n_blocks=3).to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(params=model.parameters(), lr=args.lr)
 
@@ -54,7 +55,15 @@ def main():
     eval_dataset = IRDataset(args.eval_file)
     eval_dataloader = DataLoader(dataset=eval_dataset, batch_size=1)
 
+    if args.best_weights is not None:
+        state_dict = model.state_dict()
+        for n, p in t.load(args.best_weights, map_location=lambda storage, loc: storage).items():
+            if n in state_dict.keys():
+                state_dict[n].copy_(p)
+            else:
+                raise KeyError(n)
     best_weights = copy.deepcopy(model.state_dict())
+
     best_epoch = 0
     best_psnr = 0.0
 
@@ -82,8 +91,8 @@ def main():
                 tq.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
                 tq.update(len(inputs))
 
-                if i % 1000 == 0:
-                    print(i)
+                # if i % 10 == 0:
+                print(i, epoch_losses.avg)
 
         t.save(model.state_dict(), os.path.join(args.outputs_dir, 'epoch_{}.pth'.format(epoch)))
         model.eval()
@@ -99,7 +108,7 @@ def main():
 
             epoch_psnr.update(calc_psnr(preds, labels), len(inputs))
 
-        print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
+        print(epoch, ', eval psnr: {:.2f}'.format(epoch_psnr.avg))
 
         del inputs, labels, preds
         s_writer.add_scalar('IRCNN/MSE_Loss', epoch_losses.val, epoch)
@@ -108,6 +117,7 @@ def main():
             best_epoch = epoch
             best_psnr = epoch_psnr.avg
             best_weights = copy.deepcopy(model.state_dict())
+            t.save(best_weights, os.path.join(args.outputs_dir, 'best.pth'))
 
     print('best epoch: {}, psnr: {:.2f}'.format(best_epoch, best_psnr))
     t.save(best_weights, os.path.join(args.outputs_dir, 'best.pth'))
