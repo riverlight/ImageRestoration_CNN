@@ -2,6 +2,7 @@
 
 from torch import nn
 import torch as t
+import torchvision
 
 
 class IRCNN(nn.Module):
@@ -158,6 +159,86 @@ class IRResNet(nn.Module):
         return sr_imgs
 
 
+class TruncatedVGG19(nn.Module):
+    """
+    truncated VGG19网络，用于计算VGG特征空间的MSE损失
+    """
+
+    def __init__(self, i, j):
+        """
+        :参数 i: 第 i 个池化层
+        :参数 j: 第 j 个卷积层
+        """
+        super(TruncatedVGG19, self).__init__()
+
+        # 加载预训练的VGG模型
+        vgg19 = torchvision.models.vgg19(pretrained=True)  # C:\Users\Administrator/.cache\torch\checkpoints\vgg19-dcbb9e9d.pth
+
+        maxpool_counter = 0
+        conv_counter = 0
+        truncate_at = 0
+        # 迭代搜索
+        for layer in vgg19.features.children():
+            truncate_at += 1
+
+            # 统计
+            if isinstance(layer, nn.Conv2d):
+                conv_counter += 1
+            if isinstance(layer, nn.MaxPool2d):
+                maxpool_counter += 1
+                conv_counter = 0
+
+            # 截断位置在第(i-1)个池化层之后（第 i 个池化层之前）的第 j 个卷积层
+            if maxpool_counter == i - 1 and conv_counter == j:
+                break
+
+        # 检查是否满足条件
+        assert maxpool_counter == i - 1 and conv_counter == j, "当前 i=%d 、 j=%d 不满足 VGG19 模型结构" % (
+            i, j)
+
+        # 截取网络
+        self.truncated_vgg19 = nn.Sequential(*list(vgg19.features.children())[:truncate_at + 1])
+
+    def forward(self, input):
+        """
+        前向传播
+        参数 input: 高清原始图或超分重建图，张量表示，大小为 (N, 3, w * scaling factor, h * scaling factor)
+        返回: VGG19特征图，张量表示，大小为 (N, feature_map_channels, feature_map_w, feature_map_h)
+        """
+        output = self.truncated_vgg19(input)  # (N, feature_map_channels, feature_map_w, feature_map_h)
+
+        return output
+
+
+def test_truncated_vgg19():
+    tv = TruncatedVGG19(1, 2)
+    vgg = torchvision.models.vgg19()
+
+    tv_p_len = 0
+    for name, params in tv.named_parameters():
+        print(name, params.shape)
+        size = 1
+        for item in params.shape:
+            size *= item
+        tv_p_len += size
+        print(type(params), len(params))
+
+    vgg_p_len = 0
+    for name, params in vgg.named_parameters():
+        # print(name, params.shape)
+        size = 1
+        for item in params.shape:
+            size *= item
+        vgg_p_len += size
+
+    print('len : ', tv_p_len, vgg_p_len)
+    # t.save(tv.state_dict(), 'd:/aa.pth')
+    # t.save(vgg.state_dict(), 'd:/bb.pth')
+    inputs = t.rand(1, 3, 160, 160).to('cpu')
+    outputs = tv(inputs)
+    print(outputs.shape)
+
+
 def test_ircnn():
     ir = IRCNN(num_channels=3).to('cuda')
     for name, params in ir.named_parameters():
@@ -179,5 +260,23 @@ def test_irrestnet():
     outputs = ir(inputs)
     # print(outputs)
 
+
+def test_conv():
+    c = nn.Conv2d(3, 32, 5, 1, 3)
+    inputs = t.rand(1, 3, 12, 12).to('cpu')
+    print(c.padding, c.stride, c.kernel_size)
+    outputs = c(inputs)
+    print(outputs.shape)
+
+    seq = nn.Sequential(
+        # 输入 3 x 96 x 96
+        nn.Conv2d(3, 1, 13, 7, 1, bias=False),
+        nn.LeakyReLU(0.2, inplace=True))
+    outputs = seq(inputs).view(-1)
+    print(type(outputs))
+    print(outputs.shape)
+
 if __name__ == "__main__":
-    test_irrestnet()
+    # test_irrestnet()
+    # test_truncated_vgg19()
+    test_conv()

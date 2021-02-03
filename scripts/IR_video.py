@@ -12,7 +12,7 @@ import utils
 
 
 class CDeblock:
-    def __init__(self, weights_file='./weights/best-resnet_107.pth'):
+    def __init__(self, weights_file='./weights/best-enc_228.pth'):
         os.chdir('../')
         self.device = t.device('cuda:0' if t.cuda.is_available() else 'cpu')
         self.ir = IRResNet(n_blocks=3).to(self.device)
@@ -40,7 +40,7 @@ class CDeblock:
 
 
 def main():
-    s_mp4 = "d:/workroom/testroom/48.mp4"
+    s_mp4 = "d:/workroom/testroom/48-ir-old.mp4"
     cap = cv2.VideoCapture(s_mp4)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
