@@ -61,11 +61,11 @@ def merge_video():
 
 
 def merge_pic():
-    work_dir = "D:/workroom/project/riverlight/ImageRestoration_CNN/sample/q10"
-    lst_image = ['he-test0.jpg',
-                 'he-test0-q10.jpg',
-                 'he-test0-q10-ir-old.jpg',
-                 'he-test0-q10-ir-old-ir.jpg']
+    work_dir = "D:/workroom/project/riverlight/ImageRestoration_CNN/sample/"
+    lst_image = ['gotham.jpg',
+                 'gotham-q15.jpg',
+                 'gotham-q15-ir-old.jpg',
+                 'gotham-q15-ir.jpg']
 
     lst_image_final = list()
     width = 0
@@ -89,8 +89,8 @@ def merge_pic():
     cv2.imwrite(os.path.join(work_dir, ("res.jpg")), image_res)
 
 def main():
-    # merge_pic()
-    merge_video()
+    merge_pic()
+    # merge_video()
 
 
 if __name__ == "__main__":

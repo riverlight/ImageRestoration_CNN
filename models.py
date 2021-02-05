@@ -159,6 +159,18 @@ class IRResNet(nn.Module):
         return sr_imgs
 
 
+class Generator(nn.Module):
+    """生成器：直接用 IR-Resnet """
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.net = IRResNet(n_blocks=3)
+
+    def forward(self, inputs):
+        outputs = self.net(inputs)
+
+        return outputs
+
+
 class TruncatedVGG19(nn.Module):
     """
     truncated VGG19网络，用于计算VGG特征空间的MSE损失
@@ -208,6 +220,90 @@ class TruncatedVGG19(nn.Module):
         output = self.truncated_vgg19(input)  # (N, feature_map_channels, feature_map_w, feature_map_h)
 
         return output
+
+
+class Discriminator(nn.Module):
+    """ 判别器 """
+
+    def __init__(self, kernel_size=3, n_channels=64, n_blocks=4, fc_size=64):
+        super(Discriminator, self).__init__()
+        in_channels = 3
+        conv_blocks = list()
+        for i in range(n_blocks):
+            out_channels = (n_channels if i is 0 else in_channels * 2) if i % 2 is 0 else in_channels
+            conv_blocks.append(
+                ConvolutionalBlock(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
+                                   stride=1 if i % 2 is 0 else 2, batch_norm=i is not 0, activation='LeakyReLu'))
+            in_channels = out_channels
+        self.conv_blocks = nn.Sequential(*conv_blocks)
+        # 固定输出大小
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
+        self.fc1 = nn.Linear(out_channels * 4 * 4, fc_size)
+        self.leaky_relu = nn.LeakyReLU(0.2)
+        self.fc2 = nn.Linear(fc_size, 1)
+
+    def forward(self, inputs):
+        batch_size = inputs.size(0)
+        outputs = self.conv_blocks(inputs)
+        outputs = self.adaptive_pool(outputs)
+        # print("o1", outputs.shape)
+        outputs = outputs.view(batch_size, -1)
+        # print("o2", outputs.shape)
+        outputs = self.fc1(outputs)
+        outputs = self.leaky_relu(outputs)
+        outputs = self.fc2(outputs)
+        return outputs
+
+
+def test_discriminator():
+    d = Discriminator()
+    d_p_len = 0
+    for name, params in d.named_parameters():
+        print(name, params.shape)
+        size = 1
+        for item in params.shape:
+            size *= item
+        d_p_len += size
+        print('g', type(params), len(params))
+    print('d', d_p_len)
+    inputs = t.rand(1, 3, 40, 40).to('cpu')
+    outputs = d(inputs)
+    print('out shape: ', outputs.shape)
+
+
+def test_generator():
+    g = Generator()
+    g_p_len = 0
+    for name, params in g.named_parameters():
+        print(name, params.shape)
+        size = 1
+        for item in params.shape:
+            size *= item
+        g_p_len += size
+        print('g', type(params), len(params))
+    print('g', g_p_len)
+
+    inputs = t.rand(1, 3, 160, 160).to('cpu')
+    outputs0 = g(inputs)
+    print(outputs0.shape)
+    t.save(g.net.state_dict(), 'd:/g.pth')
+
+    ir = IRResNet(n_blocks=3)
+    ir.load_state_dict(t.load('d:/g.pth'))
+    t.save(ir.state_dict(), 'd:/g1.pth')
+    g_p_len = 0
+    for name, params in ir.named_parameters():
+        print(name, params.shape)
+        size = 1
+        for item in params.shape:
+            size *= item
+        g_p_len += size
+        print('ir', type(params), len(params))
+    print('ir', g_p_len)
+    outputs1 = ir(inputs)
+    print(outputs1.shape)
+    diff = outputs0 - outputs1
+    print(diff)
 
 
 def test_truncated_vgg19():
@@ -279,4 +375,6 @@ def test_conv():
 if __name__ == "__main__":
     # test_irrestnet()
     # test_truncated_vgg19()
-    test_conv()
+    # test_conv()
+    # test_generator()
+    test_discriminator()
