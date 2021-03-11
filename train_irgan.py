@@ -97,7 +97,8 @@ def main():
             labels = labels.to(device)
             outputs = generator(inputs)
             content_loss = content_loss_criterion(outputs, labels)
-            ir_discriminated = discriminator(outputs)
+            outputs_d = ((outputs - 0.5) *2).to(device) # 判别器输入范围：-1:1
+            ir_discriminated = discriminator(outputs_d)
             adversarial_loss_g = adversarial_loss_criterion(
                 ir_discriminated, torch.ones_like(ir_discriminated))
             perceptual_loss = content_loss + beta * adversarial_loss_g
@@ -108,8 +109,9 @@ def main():
             losses_a.update(perceptual_loss.item(), outputs.size(0))
 
             ## 判别器
-            ir2_discriminated = discriminator(outputs.detach())
-            src_discriminated = discriminator(labels)
+            ir2_discriminated = discriminator(outputs_d.detach())
+            labels_d = ((labels - 0.5) * 2).to(device)
+            src_discriminated = discriminator(labels_d)
             adversarial_loss_d = adversarial_loss_criterion(ir2_discriminated, t.zeros_like(ir2_discriminated)) + \
                                 adversarial_loss_criterion(src_discriminated, t.ones_like(src_discriminated))
             optimizer_d.zero_grad()
@@ -120,7 +122,7 @@ def main():
             print("epoch : {}, batch : {}, loss : {} {} {}".format(epoch, i, losses_c.avg, losses_a.avg, losses_d.avg))
             print("loss : ", perceptual_loss.item(), content_loss.item(), adversarial_loss_g.item(), adversarial_loss_d.item())
 
-        del inputs, labels, outputs, ir_discriminated, ir2_discriminated, src_discriminated  # 手工清除掉缓存
+        del inputs, labels, outputs, ir_discriminated, ir2_discriminated, src_discriminated, labels_d, outputs_d  # 手工清除掉缓存
         print("epoch id : ", epoch)
         print("loss : ", losses_c.avg, losses_a.avg, losses_d.avg)
         eval(generator, eval_dataloader, device, epoch)

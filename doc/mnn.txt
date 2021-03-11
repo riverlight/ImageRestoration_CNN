@@ -1,0 +1,16 @@
+protobuf ：注意 zlib 库，必须要
+
+
+
+cmake -G "Unix Makefiles" -DMNN_BUILD_SHARED_LIBS=OFF -DMNN_BUILD_CONVERTER=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../../../install ../..
+cmake -G "Unix Makefiles"  -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=../../../../install  ../..
+
+zlib:
+cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../../../install ../..
+
+模型量化工具：
+-DMNN_BUILD_QUANTOOLS=on
+cmake -G "Unix Makefiles" -DMNN_BUILD_SHARED_LIBS=OFF -DMNN_BUILD_QUANTOOLS=on -DMNN_BUILD_CONVERTER=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../../../install ../..
+
+libMNN.a
+cmake -G "Unix Makefiles" -DMNN_BUILD_SHARED_LIBS=OFF -DCMAKE_SYSTEM_PROCESSOR=$PROCESSOR_ARCHITECTURE -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_BUILD_TYPE=Release ../..

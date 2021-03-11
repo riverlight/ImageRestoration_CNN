@@ -1,0 +1,1 @@
+python3 train.py --train-file=datasets\denoise-train.h5 --outputs-dir=weights --eval-file=datasets\denoise-eval.h5

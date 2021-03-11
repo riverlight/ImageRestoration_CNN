@@ -225,7 +225,7 @@ class TruncatedVGG19(nn.Module):
 class Discriminator(nn.Module):
     """ 判别器 """
 
-    def __init__(self, kernel_size=3, n_channels=64, n_blocks=4, fc_size=64):
+    def __init__(self, kernel_size=3, n_channels=64, n_blocks=4, fc_size=128):
         super(Discriminator, self).__init__()
         in_channels = 3
         conv_blocks = list()
@@ -237,8 +237,8 @@ class Discriminator(nn.Module):
             in_channels = out_channels
         self.conv_blocks = nn.Sequential(*conv_blocks)
         # 固定输出大小
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
-        self.fc1 = nn.Linear(out_channels * 4 * 4, fc_size)
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((6, 6))
+        self.fc1 = nn.Linear(out_channels * 6 * 6, fc_size)
         self.leaky_relu = nn.LeakyReLU(0.2)
         self.fc2 = nn.Linear(fc_size, 1)
 
@@ -266,7 +266,7 @@ def test_discriminator():
         d_p_len += size
         print('g', type(params), len(params))
     print('d', d_p_len)
-    inputs = t.rand(1, 3, 40, 40).to('cpu')
+    inputs = t.rand(1, 3, 48, 48).to('cpu')
     outputs = d(inputs)
     print('out shape: ', outputs.shape)
 
