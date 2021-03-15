@@ -4,9 +4,6 @@
 #include <memory>
 #include <opencv2/highgui/highgui.hpp>    
 #include <opencv2/imgproc/imgproc.hpp>
-
-
-#include <MNN/ImageProcess.hpp>
 #include <MNN/Interpreter.hpp>
 
 
@@ -19,6 +16,7 @@ using namespace MNN;
 
 
 using namespace std;
+using namespace cv;
 
 #define LClip(x, lmin ,lmax) ((x)<lmin ? lmin : ( (x)>lmax ? lmax : (x) ))
 
@@ -68,11 +66,8 @@ void MNNTensor_2_Mat(MNN::Tensor& t, cv::Mat& m)
     }
 }
 
-
-int main(int argc, char* argv[])
+static void IR_Image()
 {
-	cout << "Hi, this is MNN test program!" << endl;
-
     const auto poseModel = "../model/best-resnet_305.mnn";
     const auto inputImageFileName = "d:/workroom/testroom/v0.png";
     int width, height;
@@ -106,9 +101,67 @@ int main(int argc, char* argv[])
         mnnNet->runSession(session);
     }
     MNNTensor_2_Mat(*output, img);
-    
+
     cv::imwrite("d:/1.jpg", img);
     cout << "done" << endl;
+}
+
+void IR_Video()
+{
+    VideoCapture inputV("d:/workroom/testroom/48.mp4");
+    VideoWriter outputV;
+    if (!outputV.open("d:/workroom/testroom/48-mnn.avi", VideoWriter::fourcc('M', 'J', 'P', 'G'), inputV.get(CAP_PROP_FPS), \
+            Size(inputV.get(CAP_PROP_FRAME_WIDTH), inputV.get(CAP_PROP_FRAME_HEIGHT))))
+        return;
+
+    int width, height;
+    width = inputV.get(CAP_PROP_FRAME_WIDTH);
+    height = inputV.get(CAP_PROP_FRAME_HEIGHT);
+
+    // create net and session
+    auto mnnNet = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile("../model/best-resnet_305.mnn"));
+    MNN::ScheduleConfig netConfig;
+    netConfig.type = MNN_FORWARD_CPU;
+    netConfig.numThread = 3;
+    auto session = mnnNet->createSession(netConfig);
+    auto input = mnnNet->getSessionInput(session, nullptr);
+    mnnNet->resizeTensor(input, { 1, 3, height, width });
+    mnnNet->resizeSession(session);
+
+    auto output = mnnNet->getSessionOutput(session, nullptr);
+    mnnNet->resizeTensor(output, { 1, 3, height, width });
+    mnnNet->resizeSession(session);
+
+    Mat frame;
+    int count = 0;
+    while (1) {
+        std::cout << "frame id : " << count << endl;
+
+        inputV >> frame;
+        if (frame.empty())
+            break;
+        
+        Mat_2_MNNTensor(frame, *input);
+        mnnNet->runSession(session);
+        MNNTensor_2_Mat(*output, frame);
+
+        outputV << frame;
+        count++;
+        if (count > 25 * 3)
+            break;
+    }
+    mnnNet->releaseSession(session);
+
+    outputV.release();
+    inputV.release();
+}
+
+
+int main(int argc, char* argv[])
+{
+	cout << "Hi, this is MNN test program!" << endl;
+
+    IR_Video();
 
 	return 0;
 }
