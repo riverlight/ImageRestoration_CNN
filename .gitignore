@@ -133,3 +133,7 @@ dmypy.json
 runs/
 
 weights/epoch*
+sample
+weights
+
+datasets
