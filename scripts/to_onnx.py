@@ -9,8 +9,24 @@ import onnxruntime as ort
 import onnx
 import sys
 sys.path.append('../')
-from models import IRResNet
+from models import IRResNet, IRTestNet
 
+# onnx -> mnn
+"""
+./MNNConvert -f ONNX --modelFile XXX.onnx --MNNModel XXX.mnn --bizCode biz
+"""
+
+
+def export_testnet():
+    device = 'cpu'
+    export_onnx_file = "d:/irtestnet.onnx"  # 目的ONNX文件名
+    model = IRResNet(n_blocks=3).to(device)
+    input_shape = (3, 96, 96)
+    x = torch.randn(1, *input_shape).to(device)  # 生成张量
+    torch.onnx.export(model, x, export_onnx_file, verbose=False, do_constant_folding=False,  # 是否执行常量折叠优化
+                      input_names=["input11"],  # 输入名
+                      output_names=["output44"])
+    print("trans done")
 
 def save_model():
     weights_file = '../weights/best-resnet_305.pth'
@@ -104,5 +120,6 @@ if __name__=="__main__":
     # model_test()
     # check_onnx()
     # test_bycaffe2()
-    test_byort()
+    # test_byort()
+    export_testnet()
 

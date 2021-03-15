@@ -110,6 +110,28 @@ class ResidualBlock(nn.Module):
         return output
 
 
+class IRTestNet(nn.Module):
+    # test net
+    def __init__(self, large_kernel_size=9, small_kernel_size=3, n_channels=64, n_blocks=16):
+        super(IRTestNet, self).__init__()
+        # 第一个卷积块
+        kernel_size = 3
+        stride = 1
+        self.conv_block1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=kernel_size, stride=stride,
+                      padding=kernel_size // 2)
+        # 一系列残差模块, 每个残差模块包含一个跳连接
+        # self.residual_blocks = ConvolutionalBlock(in_channels=n_channels, out_channels=n_channels, kernel_size=3,
+        #                                       batch_norm=True, activation='PReLu')
+
+    def forward(self, lr_imgs):
+        output = self.conv_block1(lr_imgs)  # (16, 3, 24, 24)
+        residual = output  # (16, 64, 24, 24)
+        # output = self.residual_blocks(output)  # (16, 64, 24, 24)
+        # output = output + residual
+        return output
+
+
+
 class IRResNet(nn.Module):
     """
     SRResNet模型
