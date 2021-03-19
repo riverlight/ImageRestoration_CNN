@@ -3,6 +3,7 @@
 from torch import nn
 import torch as t
 import torchvision
+import torch.nn.functional as F
 
 
 class IRCNN(nn.Module):
@@ -73,6 +74,90 @@ class ConvolutionalBlock(nn.Module):
         output = self.conv_block(input)
 
         return output
+
+
+class SeparableConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False):
+        super(SeparableConv2d, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size, stride, padding, dilation, groups=in_channels,
+                               bias=bias)
+        self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, 1, 1, bias=bias)
+        self.activation = nn.LeakyReLU(0.2)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.pointwise(x)
+        x = self.activation(x)
+        return x
+
+
+class Conv9x9(nn.Module):
+    def __init__(self):
+        super(Conv9x9, self).__init__()
+        self.conv1 = ConvolutionalBlock(3, 16, 5, batch_norm=False, activation="leakyrelu")
+        self.dwConv2 = SeparableConv2d(16, 32, 3, 1, 1, bias=False)
+        self.dwConv3 = SeparableConv2d(32, 64, 3, 1, 1, bias=True)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.dwConv2(x)
+        x = self.dwConv3(x)
+        return x
+
+class Bottleneck(nn.Module):
+    # 前面1x1和3x3卷积的filter个数相等，最后1x1卷积是其expansion倍
+    expansion = 4
+
+    def __init__(self, in_planes, planes, stride=1, skip=False):
+        super(Bottleneck, self).__init__()
+        self.skip = False
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3,
+                               stride=stride, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.conv3 = nn.Conv2d(planes, self.expansion*planes,
+                               kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
+
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*planes)
+            )
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        if self.skip is False:
+            out += self.shortcut(x)
+        out = F.relu(out)
+        return out
+
+
+class NewIRNet(nn.Module):
+    def __init__(self):
+        super(NewIRNet, self).__init__()
+        self.conv1 = Conv9x9()
+        self.bn2 = Bottleneck(64, 16)
+        self.bn3 = Bottleneck(64, 16)
+        self.bn4 = Bottleneck(64, 16, skip=True)
+        # 最后一个卷积模块
+        self.conv5 = ConvolutionalBlock(in_channels=64, out_channels=3, kernel_size=3,
+                                              batch_norm=False, activation='Tanh')
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn2(out)
+        out = self.bn3(out)
+        out = self.bn4(out)
+        out = self.conv5(out)
+        # out = out + x
+        return out
 
 
 class ResidualBlock(nn.Module):

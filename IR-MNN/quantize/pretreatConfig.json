@@ -1,0 +1,25 @@
+{
+    "format":"RGB",
+    "mean":[
+        0.0,
+        0.0,
+        0.0
+    ],
+    "normal":[
+        0.00392157,
+        0.00392157,
+        0.00392157
+    ],
+    "width":96,
+    "height":96,
+    "path":"./images/",
+    "used_image_num":200,
+    "feature_quantize_method":"KL",
+    "weight_quantize_method":"MAX_ABS",
+    "feature_clamp_value":127,
+    "weight_clamp_value":127,
+    "skip_quant_op_names":[
+
+    ],
+    "debug":false
+}

@@ -6,19 +6,17 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <MNN/Interpreter.hpp>
 
-
 #define MNN_OPEN_TIME_TRACE
 #include <MNN/AutoTime.hpp>
+
 using namespace MNN;
-
-
-#define OUTPUT_STRIDE 16
-
-
 using namespace std;
 using namespace cv;
 
 #define LClip(x, lmin ,lmax) ((x)<lmin ? lmin : ( (x)>lmax ? lmax : (x) ))
+
+//const char* modelFile = "../model/best-resnet_305-q.mnn";
+const char* modelFile = "d:/nir_best.mnn";
 
 void MNNTensor_2_RGB(MNN::Tensor* pTensor, unsigned char* rgb)
 {
@@ -38,12 +36,17 @@ void MNNTensor_2_RGB(MNN::Tensor* pTensor, unsigned char* rgb)
 
 void Mat_2_MNNTensor(cv::Mat& m, MNN::Tensor& t)
 {
+    cout << t.stride(0) << " " << t.stride(1) << " " << t.stride(2) << endl;
+    cout << t.length(0) << " " << t.length(1) << " " << t.length(2) << endl;
+
     int width = m.cols;
     int height = m.rows;
+    int factor = t.stride(0) / (width * height);
+    cout << "factor : " << factor << endl;
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             unsigned char* s = (uchar *)&m.at<cv::Vec3b>(i, j)[0];
-            float* d = t.host<float>() + (i * width + j) * 4;
+            float* d = t.host<float>() + (i * width + j) * factor;
             d[0] = float(s[0]) / 255.0;
             d[1] = float(s[1]) / 255.0;
             d[2] = float(s[2]) / 255.0;
@@ -53,12 +56,19 @@ void Mat_2_MNNTensor(cv::Mat& m, MNN::Tensor& t)
 
 void MNNTensor_2_Mat(MNN::Tensor& t, cv::Mat& m)
 {
+    cout << t.stride(0) << " " << t.stride(1) << " " << t.stride(2) << endl;
+    cout << t.length(0) << " " << t.length(1) << " " << t.length(2) << endl;
+    t.printShape();
+    cout << t.batch() << endl;
+    
     int width = m.cols;
     int height = m.rows;
+    int factor = t.stride(0) / (width*height);
+    cout << "factor : " << factor << " " << width << " " << height << endl;
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             unsigned char* d = (uchar*)&m.at<cv::Vec3b>(i, j)[0];
-            float* s = t.host<float>() + (i * width + j) * 4;
+            float* s = t.host<float>() + (i * width + j) * factor;
             d[0] = LClip(s[0] * 255, 0, 255);
             d[1] = LClip(s[1] * 255, 0, 255);
             d[2] = LClip(s[2] * 255, 0, 255);
@@ -68,7 +78,7 @@ void MNNTensor_2_Mat(MNN::Tensor& t, cv::Mat& m)
 
 static void IR_Image()
 {
-    const auto poseModel = "../model/best-resnet_305.mnn";
+    const auto poseModel = modelFile;
     const auto inputImageFileName = "d:/workroom/testroom/v0.png";
     int width, height;
     cv::Mat img;
@@ -80,7 +90,7 @@ static void IR_Image()
     auto mnnNet = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(poseModel));
     MNN::ScheduleConfig netConfig;
     netConfig.type = MNN_FORWARD_CPU;
-    netConfig.numThread = 3;
+    netConfig.numThread = 1;
     auto session = mnnNet->createSession(netConfig);
 
     auto input = mnnNet->getSessionInput(session, nullptr);
@@ -100,6 +110,7 @@ static void IR_Image()
         AUTOTIME;
         mnnNet->runSession(session);
     }
+    output = mnnNet->getSessionOutput(session, nullptr);
     MNNTensor_2_Mat(*output, img);
 
     cv::imwrite("d:/1.jpg", img);
@@ -119,7 +130,7 @@ void IR_Video()
     height = inputV.get(CAP_PROP_FRAME_HEIGHT);
 
     // create net and session
-    auto mnnNet = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile("../model/best-resnet_305.mnn"));
+    auto mnnNet = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(modelFile));
     MNN::ScheduleConfig netConfig;
     netConfig.type = MNN_FORWARD_CPU;
     netConfig.numThread = 3;
@@ -161,7 +172,8 @@ int main(int argc, char* argv[])
 {
 	cout << "Hi, this is MNN test program!" << endl;
 
-    IR_Video();
+    //IR_Video();
+    IR_Image();
 
 	return 0;
 }
