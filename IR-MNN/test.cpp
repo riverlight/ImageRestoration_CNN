@@ -16,7 +16,7 @@ using namespace cv;
 #define LClip(x, lmin ,lmax) ((x)<lmin ? lmin : ( (x)>lmax ? lmax : (x) ))
 
 //const char* modelFile = "../model/best-resnet_305-q.mnn";
-const char* modelFile = "d:/nir_best.mnn";
+const char* modelFile = "d:/nir2_best.mnn";
 
 void MNNTensor_2_RGB(MNN::Tensor* pTensor, unsigned char* rgb)
 {
@@ -36,13 +36,9 @@ void MNNTensor_2_RGB(MNN::Tensor* pTensor, unsigned char* rgb)
 
 void Mat_2_MNNTensor(cv::Mat& m, MNN::Tensor& t)
 {
-    cout << t.stride(0) << " " << t.stride(1) << " " << t.stride(2) << endl;
-    cout << t.length(0) << " " << t.length(1) << " " << t.length(2) << endl;
-
     int width = m.cols;
     int height = m.rows;
     int factor = t.stride(0) / (width * height);
-    cout << "factor : " << factor << endl;
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             unsigned char* s = (uchar *)&m.at<cv::Vec3b>(i, j)[0];
@@ -56,22 +52,19 @@ void Mat_2_MNNTensor(cv::Mat& m, MNN::Tensor& t)
 
 void MNNTensor_2_Mat(MNN::Tensor& t, cv::Mat& m)
 {
-    cout << t.stride(0) << " " << t.stride(1) << " " << t.stride(2) << endl;
-    cout << t.length(0) << " " << t.length(1) << " " << t.length(2) << endl;
-    t.printShape();
-    cout << t.batch() << endl;
-    
     int width = m.cols;
     int height = m.rows;
     int factor = t.stride(0) / (width*height);
-    cout << "factor : " << factor << " " << width << " " << height << endl;
+    float* r = t.host<float>() + t.stride(1) * 0;
+    float* g = t.host<float>() + t.stride(1) * 1;
+    float* b = t.host<float>() + t.stride(1) * 2;
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             unsigned char* d = (uchar*)&m.at<cv::Vec3b>(i, j)[0];
-            float* s = t.host<float>() + (i * width + j) * factor;
-            d[0] = LClip(s[0] * 255, 0, 255);
-            d[1] = LClip(s[1] * 255, 0, 255);
-            d[2] = LClip(s[2] * 255, 0, 255);
+            int offset = i * width + j;
+            d[0] = LClip(r[offset] * 255, 0, 255);
+            d[1] = LClip(g[offset] * 255, 0, 255);
+            d[2] = LClip(b[offset] * 255, 0, 255);
         }
     }
 }
@@ -85,21 +78,33 @@ static void IR_Image()
     img = cv::imread(inputImageFileName);
     width = img.cols;
     height = img.rows;
+    cout << "img chn : " << img.channels() << endl;
 
     // create net and session
     auto mnnNet = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(poseModel));
     MNN::ScheduleConfig netConfig;
     netConfig.type = MNN_FORWARD_CPU;
-    netConfig.numThread = 1;
+    netConfig.numThread = 3;
     auto session = mnnNet->createSession(netConfig);
 
     auto input = mnnNet->getSessionInput(session, nullptr);
+    input->printShape();
+    //input->print();
     mnnNet->resizeTensor(input, { 1, 3, height, width });
-    mnnNet->resizeSession(session);
+    //mnnNet->resizeSession(session);
 
     auto output = mnnNet->getSessionOutput(session, nullptr);
+    output->printShape();
+    cout << "stride : " << input->stride(0) << " " << input->stride(1) << " " << input->stride(2) << endl;
+    cout << "stride : " << output->stride(0) << " " << output->stride(1) << " " << output->stride(2) << endl;
+    //output->print();
+
     mnnNet->resizeTensor(output, { 1, 3, height, width });
     mnnNet->resizeSession(session);
+    input->printShape();
+    output->printShape();
+    cout << "stride : " << input->stride(0) << " " << input->stride(1) << " " << input->stride(2) << endl;
+    cout << "stride : " << output->stride(0) << " " << output->stride(1) << " " << output->stride(2) << endl;
 
     Mat_2_MNNTensor(img, *input);
 
@@ -119,9 +124,9 @@ static void IR_Image()
 
 void IR_Video()
 {
-    VideoCapture inputV("d:/workroom/testroom/48.mp4");
+    VideoCapture inputV("d:/workroom/testroom/fei-light.mp4");
     VideoWriter outputV;
-    if (!outputV.open("d:/workroom/testroom/48-mnn.avi", VideoWriter::fourcc('M', 'J', 'P', 'G'), inputV.get(CAP_PROP_FPS), \
+    if (!outputV.open("d:/workroom/testroom/fei-light-mnn.avi", VideoWriter::fourcc('M', 'J', 'P', 'G'), inputV.get(CAP_PROP_FPS), \
             Size(inputV.get(CAP_PROP_FRAME_WIDTH), inputV.get(CAP_PROP_FRAME_HEIGHT))))
         return;
 
@@ -172,8 +177,8 @@ int main(int argc, char* argv[])
 {
 	cout << "Hi, this is MNN test program!" << endl;
 
-    //IR_Video();
-    IR_Image();
+    IR_Video();
+    //IR_Image();
 
 	return 0;
 }

@@ -75,6 +75,43 @@ class ConvolutionalBlock(nn.Module):
 
         return output
 
+class M3Block(nn.Module):
+    '''expand + depthwise + pointwise'''
+    def __init__(self, kernel_size, in_size, expand_size, out_size):
+        super(M3Block, self).__init__()
+        self.stride = 1
+
+        self.conv1 = nn.Conv2d(in_size, expand_size, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(expand_size, expand_size, kernel_size=kernel_size, stride=1, padding=kernel_size//2, groups=expand_size, bias=False)
+        self.conv3 = nn.Conv2d(expand_size, out_size, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn3 = nn.BatchNorm2d(out_size)
+
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.bn3(self.conv3(out))
+        return out
+
+
+class M3Conv(nn.Module):
+    def __init__(self):
+        super(M3Conv, self).__init__()
+        expand_size = 16
+        self.conv1 = nn.Conv2d(64, expand_size, kernel_size=1, stride=1, padding=0, bias=False)
+        self.nolinear1 = nn.PReLU()
+        self.conv2 = nn.Conv2d(expand_size, expand_size, kernel_size=9, stride=1,
+                               padding=9 // 2, groups=expand_size, bias=False)
+        self.nolinear2 = nn.PReLU()
+        self.conv3 = nn.Conv2d(expand_size, 3, kernel_size=1, stride=1, padding=0, bias=False)
+
+    def forward(self, x):
+        out = self.nolinear1(self.conv1(x))
+        out = self.nolinear2(self.conv2(out))
+        out = self.conv3(out)
+        return out
+
+
 
 class SeparableConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False):
@@ -83,7 +120,7 @@ class SeparableConv2d(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size, stride, padding, dilation, groups=in_channels,
                                bias=bias)
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, 1, 1, bias=bias)
-        self.activation = nn.LeakyReLU(0.2)
+        self.activation = nn.PReLU()
 
     def forward(self, x):
         x = self.conv1(x)
@@ -95,7 +132,7 @@ class SeparableConv2d(nn.Module):
 class Conv9x9(nn.Module):
     def __init__(self):
         super(Conv9x9, self).__init__()
-        self.conv1 = ConvolutionalBlock(3, 16, 5, batch_norm=False, activation="leakyrelu")
+        self.conv1 = ConvolutionalBlock(3, 16, 5, batch_norm=False, activation="prelu")
         self.dwConv2 = SeparableConv2d(16, 32, 3, 1, 1, bias=False)
         self.dwConv3 = SeparableConv2d(32, 64, 3, 1, 1, bias=True)
 
@@ -138,16 +175,54 @@ class Bottleneck(nn.Module):
         out = F.relu(out)
         return out
 
+class NewIRNet2(nn.Module):
+    def __init__(self):
+        super(NewIRNet2, self).__init__()
+        channelnum = 64
+        self.conv1 = Conv9x9()
+        self.bn2 = Bottleneck(channelnum, int(channelnum / 4))
+        self.bn3 = Bottleneck(channelnum, int(channelnum / 4))
+        self.bn4 = Bottleneck(channelnum, int(channelnum / 4))
+
+        # 第二个卷积块
+        self.conv_block5 = ConvolutionalBlock(in_channels=channelnum, out_channels=channelnum,
+                                              kernel_size=3,
+                                              batch_norm=True, activation=None)
+        # self.conv_block5 = M3Block(3, 64, 16, 64, nn.ReLU(), None, 1)
+
+        # 最后一个卷积模块
+        # self.conv_block6 = ConvolutionalBlock(in_channels=channelnum, out_channels=3, kernel_size=9,
+        #                                       batch_norm=False, activation='Tanh')
+        self.conv_block6 = M3Conv()
+        self.relu6 = nn.Tanh()
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn2(out)
+        out = self.bn3(out)
+        out = self.bn4(out)
+        out = self.conv_block5(out)
+        out = self.relu6(self.conv_block6(out))
+        out = out + x
+        return out
+
 
 class NewIRNet(nn.Module):
     def __init__(self):
         super(NewIRNet, self).__init__()
+        channelnum = 64
         self.conv1 = Conv9x9()
-        self.bn2 = Bottleneck(64, 16)
-        self.bn3 = Bottleneck(64, 16)
-        self.bn4 = Bottleneck(64, 16, skip=True)
+        self.bn2 = Bottleneck(channelnum, int(channelnum/4))
+        self.bn3 = Bottleneck(channelnum, int(channelnum/4))
+        self.bn4 = Bottleneck(channelnum, int(channelnum/4))
+
+        # 第二个卷积块
+        self.conv_block5 = ConvolutionalBlock(in_channels=channelnum, out_channels=channelnum,
+                                              kernel_size=3,
+                                              batch_norm=True, activation=None)
+
         # 最后一个卷积模块
-        self.conv5 = ConvolutionalBlock(in_channels=64, out_channels=3, kernel_size=3,
+        self.conv_block6 = ConvolutionalBlock(in_channels=channelnum, out_channels=3, kernel_size=9,
                                               batch_norm=False, activation='Tanh')
 
     def forward(self, x):
@@ -155,8 +230,9 @@ class NewIRNet(nn.Module):
         out = self.bn2(out)
         out = self.bn3(out)
         out = self.bn4(out)
-        out = self.conv5(out)
-        # out = out + x
+        out = self.conv_block5(out)
+        out = self.conv_block6(out)
+        out = out + x
         return out
 
 

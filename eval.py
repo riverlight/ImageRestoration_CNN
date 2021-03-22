@@ -8,6 +8,7 @@ from models import *
 import cv2
 import numpy as np
 
+t.nn.Module.dump_patches = True
 
 def main():
     eval_file = "./weights/nir_best.pth"
@@ -37,11 +38,13 @@ def main():
     print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
 
 
-def eval_image():
+def eval_image(eval_file=None):
     image_file = "sample/q10/he-test0-q10.jpg"
-    out_file = image_file.replace('.', '-ir.')
-    eval_file = "./weights/ir-0310.pth"
-    # eval_file = "d:/tnet.pth"
+    out_file = image_file.replace('.', '-nir.')
+    if eval_file is None:
+        # eval_file = "./weights/ir-0310.pth"
+        # eval_file = "./weights/nir_best.pth"
+        eval_file = "./weights/nir_epoch2_228.pth"
     device = 'cuda'
     net = t.load(eval_file)
     net = net.to(device)
@@ -49,16 +52,37 @@ def eval_image():
     image = cv2.imread(image_file).astype(np.float32)
     image = t.from_numpy(image).to(device) / 255
     image = image.permute(2, 0, 1).unsqueeze(0)
+    # print(image.shape)
 
     with t.no_grad():
         preds = net(image).clamp(0.0, 1.0)
+    # print(preds.shape)
     preds = preds.mul(255.0).cpu().numpy().squeeze(0).transpose(1, 2, 0)
     cv2.imwrite(out_file, preds)
     print('done : ', out_file)
 
 
+def find_best():
+    best_psnr = 0
+    best_id = -1
+    for i in range(322, 329):
+        ref_file = "sample/q10/he-test0.jpg"
+        image_file = "sample/q10/he-test0-q10.jpg"
+        ir_file = image_file.replace('.', '-nir.')
+        weights_file = "./weights/nir_epoch2_{}.pth".format(i)
+        # print(weights_file)
+        eval_image(eval_file=weights_file)
+        img0 = t.from_numpy(cv2.imread(ref_file).astype(np.float32)) / 255.0
+        img1 = t.from_numpy(cv2.imread(ir_file).astype(np.float32)) / 255.0
+        psnr = calc_psnr(img0, img1)
+        if psnr > best_psnr:
+            best_psnr = psnr
+            best_id = i
+        print(best_psnr, best_id, i, psnr)
+    print("resut : ", best_psnr, best_id)
 
 if __name__=="__main__":
     # main()
-    eval_image()
+    # eval_image()
+    find_best()
 

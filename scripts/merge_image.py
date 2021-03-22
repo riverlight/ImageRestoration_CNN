@@ -7,9 +7,8 @@ import numpy as np
 
 def merge_video(direct='H'):
     work_dir = "D:/workroom/testroom/"
-    lst_video = ['gcw5.mp4',
-                 'gcw-5-ir-enh.avi',
-                 'gcw-5-ir-hdr.avi']
+    lst_video = ['fei-light.mp4',
+                 'fei-light-mnn.avi']
     lst_video_final = list()
     lst_cap = list()
     width = 0

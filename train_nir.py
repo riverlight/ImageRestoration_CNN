@@ -20,9 +20,10 @@ def main():
     batch_size = 24
     num_epochs = 400
     num_workers = 8
-    seed = 1108
-    best_weights = './w/eights/nir_best.pth'
-    best_weights = None
+    seed = 1018
+    best_weights = './weights/nir_best_354.pth'
+    # best_weights = None
+    start_epoch = 0
 
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
@@ -47,7 +48,8 @@ def main():
 
     best_epoch = 0
     best_psnr = 0.0
-    for epoch in range(num_epochs):
+    for epoch in range(num_epochs-start_epoch):
+        epoch += start_epoch
         model.train()
         epoch_losses = AverageMeter()
         with tqdm(total=(len(train_dataset) - len(train_dataset) % batch_size)) as tq:
@@ -71,7 +73,7 @@ def main():
 
                 # if i % 10 == 0:
                 print(i, epoch_losses.avg)
-        t.save(model, os.path.join(outputs_dir, 'nir_epoch_{}.pth'.format(epoch)))
+        t.save(model, os.path.join(outputs_dir, 'nir_epoch2_{}.pth'.format(epoch)))
         model.eval()
         epoch_psnr = AverageMeter()
         for data in eval_dataloader:

@@ -45,7 +45,7 @@ def save_model():
 def model_test():
     device = 'cuda'
     # weights_file = '../weights/model-0310.pth'
-    weights_file = "../weights/nir_epoch_2.pth"
+    weights_file = "../weights/nir_epoch2_292.pth"
     image_file = 'd:/workroom/testroom/v0.png'
     model = torch.load(weights_file).to(device)
     model.eval()
@@ -60,7 +60,7 @@ def model_test():
     print('load done')
     input_shape = (3, 96, 96)
     x = torch.randn(1, *input_shape).to(device)  # 生成张量
-    export_onnx_file = "../weights/nir_best.onnx"  # 目的ONNX文件名
+    export_onnx_file = "../weights/nir2_best.onnx"  # 目的ONNX文件名
     torch.onnx.export(model, x, export_onnx_file, verbose=True, do_constant_folding=True,	# 是否执行常量折叠优化
                     input_names=["input11"],	# 输入名
                     output_names=["output44"])
