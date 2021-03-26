@@ -4,7 +4,7 @@ from IR_dataset import IRDataset
 from torch.utils.data.dataloader import DataLoader
 import torch as t
 from utils import AverageMeter, calc_psnr
-from models_nir5 import *
+from models_nir6 import *
 from utils import AverageMeter, calc_psnr
 import os
 import torch.backends.cudnn as cudnn
@@ -21,9 +21,12 @@ def main():
     num_epochs = 400
     num_workers = 8
     seed = 1018
-    best_weights = './weights/nir5_epoch_99.pth'
-    # best_weights = None
-    start_epoch = 99
+    # best_weights = './weights/nir5_epoch_99.pth'
+    best_weights = None
+    start_epoch = 0
+    # 稀疏训练
+    s = 1e-5
+    sr = True # 稀疏标志 sparsity-regularization
 
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
@@ -33,7 +36,7 @@ def main():
     if best_weights is not None:
         model = t.load(best_weights)
     else:
-        model = NewIRNet5().to(device)
+        model = NewIRNet6().to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(params=model.parameters(), lr=lr)
     train_dataset = IRDataset(train_file)
@@ -66,6 +69,8 @@ def main():
 
                 optimizer.zero_grad()
                 loss.backward()
+                if sr:
+                    updateBN(model, s)
                 optimizer.step()
 
                 tq.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
@@ -73,7 +78,7 @@ def main():
 
                 # if i % 10 == 0:
                 print(i, epoch_losses.avg)
-        t.save(model, os.path.join(outputs_dir, 'nir5_epoch_{}.pth'.format(epoch)))
+        t.save(model, os.path.join(outputs_dir, 'nir6_epoch_{}.pth'.format(epoch)))
         model.eval()
         epoch_psnr = AverageMeter()
         for data in eval_dataloader:
@@ -92,7 +97,7 @@ def main():
         if epoch_psnr.avg > best_psnr:
             best_epoch = epoch
             best_psnr = epoch_psnr.avg
-            t.save(model, os.path.join(outputs_dir, 'nir5_best.pth'))
+            t.save(model, os.path.join(outputs_dir, 'nir6_best.pth'))
 
     print('best epoch: {}, psnr: {:.2f}'.format(best_epoch, best_psnr))
 

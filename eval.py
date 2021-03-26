@@ -43,8 +43,8 @@ def eval_image(eval_file=None):
     out_file = image_file.replace('.', '-nir.')
     if eval_file is None:
         # eval_file = "./weights/ir-0310.pth"
-        # eval_file = "./weights/nir_best.pth"
-        eval_file = "./weights/nir_epoch2_228.pth"
+        # eval_file = "./weights/nir3-backup/nir3_epoch_396.pth"
+        eval_file = "./weights/nir6_best.pth"
     device = 'cuda'
     net = t.load(eval_file)
     net = net.to(device)
@@ -65,11 +65,11 @@ def eval_image(eval_file=None):
 def find_best():
     best_psnr = 0
     best_id = -1
-    for i in range(322, 329):
+    for i in range(0, 400):
         ref_file = "sample/q10/he-test0.jpg"
         image_file = "sample/q10/he-test0-q10.jpg"
         ir_file = image_file.replace('.', '-nir.')
-        weights_file = "./weights/nir_epoch2_{}.pth".format(i)
+        weights_file = "./weights/nir6_epoch_{}.pth".format(i)
         # print(weights_file)
         eval_image(eval_file=weights_file)
         img0 = t.from_numpy(cv2.imread(ref_file).astype(np.float32)) / 255.0

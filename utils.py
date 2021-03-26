@@ -83,11 +83,11 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-if __name__ == "__main__":
+def test():
     # workdir = "D:\\workroom\\tools\\dataset\\IR-dataset\\eval\\"
     workdir = "./sample/q10/"
-    img0 = torch.from_numpy(cv2.imread(workdir+"he-test0.jpg").astype(np.float32)) / 255.0
-    img1 = torch.from_numpy(cv2.imread(workdir+'he-test0-q10-ir.jpg').astype(np.float32)) / 255.0
+    img0 = torch.from_numpy(cv2.imread(workdir + "he-test0.jpg").astype(np.float32)) / 255.0
+    img1 = torch.from_numpy(cv2.imread(workdir + 'he-test0-q10-ir.jpg').astype(np.float32)) / 255.0
     psnr = calc_psnr(img0, img1)
     print(psnr)
 
@@ -100,3 +100,6 @@ if __name__ == "__main__":
     img1 = torch.from_numpy(cv2.imread(workdir + 'he-test0-q10.jpg').astype(np.float32)) / 255.0
     psnr = calc_psnr(img0, img1)
     print(psnr)
+
+if __name__ == "__main__":
+    test()

@@ -9,12 +9,12 @@ from torchsummary import summary
 
 
 class BlockDW2(nn.Module):
-    def __init__(self, chl_in, chl_out, kernel):
+    def __init__(self, chl_in, chl_out, kernel, cfg):
         super(BlockDW2, self).__init__()
-        self.convDW1 = nn.Conv2d(chl_in, chl_out, kernel_size=5, stride=1, padding=5//2, groups=1, bias=False)
-        self.convDW2 = nn.Conv2d(chl_out, chl_out, kernel_size=5, stride=1, padding=5 // 2, groups=chl_out, bias=False)
-        self.convPW2 = nn.Conv2d(chl_out, chl_out, kernel_size=1, stride=1, padding=0, bias=True)
-        self.bn = nn.BatchNorm2d(chl_out)
+        self.convDW1 = nn.Conv2d(cfg[0][1], cfg[0][0], kernel_size=5, stride=1, padding=5//2, groups=1, bias=False)
+        self.convDW2 = nn.Conv2d(cfg[0][0], cfg[1][0], kernel_size=5, stride=1, padding=5 // 2, groups=cfg[0][0], bias=False)
+        self.convPW2 = nn.Conv2d(cfg[2][1], cfg[2][0], kernel_size=1, stride=1, padding=0, bias=True)
+        self.bn = nn.BatchNorm2d(cfg[3])
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -25,12 +25,12 @@ class BlockDW2(nn.Module):
 
 
 class BlockDN(nn.Module):
-    def __init__(self, chl_in, chl_out, kernel, expansion):
+    def __init__(self, chl_in, chl_out, kernel, expansion, cfg):
         super(BlockDN, self).__init__()
-        self.convPW1 = nn.Conv2d(chl_in, chl_in//expansion, kernel_size=1, stride=1)
-        self.convDW = nn.Conv2d(chl_in//expansion, chl_in//expansion, kernel, stride=1, padding=kernel//2, groups=chl_in//expansion)
-        self.convPW2 = nn.Conv2d(chl_in//expansion, chl_out, 1, stride=1, bias=True)
-        self.bn2 = nn.BatchNorm2d(chl_out)
+        self.convPW1 = nn.Conv2d(cfg[0][1], cfg[0][0], kernel_size=1, stride=1)
+        self.convDW = nn.Conv2d(cfg[0][0], cfg[1][0], kernel, stride=1, padding=kernel//2, groups=cfg[0][0])
+        self.convPW2 = nn.Conv2d(cfg[2][1], cfg[2][0], 1, stride=1, bias=True)
+        self.bn2 = nn.BatchNorm2d(cfg[3])
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -40,11 +40,11 @@ class BlockDN(nn.Module):
         return out
 
 class BlockOut(nn.Module):
-    def __init__(self, chl_in, chl_out, kernel, expansion):
+    def __init__(self, chl_in, chl_out, kernel, expansion, cfg):
         super(BlockOut, self).__init__()
-        self.convPW1 = nn.Conv2d(chl_in, chl_in//expansion, kernel_size=1, stride=1)
-        self.convDW = nn.Conv2d(chl_in//expansion, chl_in//expansion, kernel_size=kernel, stride=1, padding=kernel//2, groups=chl_in//expansion)
-        self.convPW2 = nn.Conv2d(chl_in//expansion, chl_out, 1, 1, padding=0)
+        self.convPW1 = nn.Conv2d(cfg[0][1], cfg[0][0], kernel_size=1, stride=1)
+        self.convDW = nn.Conv2d(cfg[0][0], cfg[1][0], kernel_size=kernel, stride=1, padding=kernel//2, groups=cfg[0][0])
+        self.convPW2 = nn.Conv2d(cfg[2][1], cfg[2][0], 1, 1, padding=0)
         self.relu = nn.ReLU()
         self.relu2 = nn.Tanh()
 
@@ -55,20 +55,30 @@ class BlockOut(nn.Module):
         return out
 
 class NewIRNet6(nn.Module):
-    def __init__(self):
+    def __init__(self, cfg=None):
         super(NewIRNet6, self).__init__()
         self.chl_mid = 32
-        self.convDW9x9 = BlockDW2(3, self.chl_mid, 9)
-        self.dn2 = BlockDN(self.chl_mid, self.chl_mid, 3, 4)
-        self.dn3 = BlockDN(self.chl_mid*2, self.chl_mid, 3, 4)
-        self.blockOut4 = BlockOut(self.chl_mid*3, 3, 9, 2)
+        self.lst_bn_layer_id = [3, 7, 11]
+        self.lst_bn_next_layer_id = [4, 8, 12]
+        self.lst_bn_next_cat = [[3], [3, 7], [3, 7, 11]]
+        self.cfg = cfg
+        if self.cfg is None:
+            self.cfg = [(32, 3), (32, 1), (32, 32), 32,
+                        (8, 32), (8, 1), (32, 8), 32,
+                        (16, 64), (16, 1), (32, 16), 32,
+                        (48, 96), (48, 1), (3, 48)]
+
+        self.convDW9x9 = BlockDW2(3, self.chl_mid, 9, self.cfg)
+        self.dn2 = BlockDN(self.chl_mid, self.chl_mid, 3, 4, self.cfg[4:])
+        self.dn3 = BlockDN(self.chl_mid*2, self.chl_mid, 3, 4, self.cfg[8:])
+        self.blockOut4 = BlockOut(self.chl_mid*3, 3, 9, 2, self.cfg[12:])
 
     def forward(self, x):
         dw_out = self.convDW9x9(x)
         dn2_out = self.dn2(dw_out)
         out = t.cat([dw_out, dn2_out], 1)
         dn3_out = self.dn3(out)
-        out = t.cat([dn3_out, dn2_out, dw_out], 1)
+        out = t.cat([dw_out, dn2_out, dn3_out], 1)
         out = self.blockOut4(out)
         out = out + x
         return out

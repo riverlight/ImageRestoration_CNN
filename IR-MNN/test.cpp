@@ -16,7 +16,7 @@ using namespace cv;
 #define LClip(x, lmin ,lmax) ((x)<lmin ? lmin : ( (x)>lmax ? lmax : (x) ))
 
 //const char* modelFile = "../model/best-resnet_305-q.mnn";
-const char* modelFile = "d:/nir2_best.mnn";
+const char* modelFile = "d:/nir6_best.mnn";
 
 void MNNTensor_2_RGB(MNN::Tensor* pTensor, unsigned char* rgb)
 {
@@ -177,8 +177,8 @@ int main(int argc, char* argv[])
 {
 	cout << "Hi, this is MNN test program!" << endl;
 
-    IR_Video();
-    //IR_Image();
+    //IR_Video();
+    IR_Image();
 
 	return 0;
 }
