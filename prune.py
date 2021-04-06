@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import torch as t
-from models_nir6 import *
+from models_nir7 import *
 import eval
 import utils
 import copy
@@ -9,11 +9,11 @@ import numpy as np
 
 device = 'cpu'
 # old_pth = "d:/nir6_test.pth"
-old_pth = "./weights/nir6_best.pth"
+old_pth = "./weights/nir7_best.pth"
 total = 0
-percent = 0.5
+percent = 0.29
 base_number = 1
-pruned_bn_num = 2
+pruned_bn_num = 3
 
 def eval_model(model):
     pruned_pth = "./weights/pruned.pth"
@@ -72,7 +72,6 @@ def pre_prune(model, thres):
                 m.bias.data.mul_(mask)
                 lst_shape.append(int(remain_channels))
                 lst_bn_mask.append(mask.clone())
-                print("mask shape : ", mask.shape)
                 print('layer_index: {:d} \t total_channel: {:d} \t remaining_channel: {:d} \t pruned_ratio: {:f}'.
                       format(k, mask.shape[0], int(t.sum(mask)), (mask.shape[0] - t.sum(mask)) / mask.shape[0]))
             else:
@@ -92,7 +91,6 @@ def pre_prune(model, thres):
     # 调整 lst_shape
     for bn_id in lst_bn_id:
         bn_shape = lst_shape[bn_id]
-        print(bn_id, bn_shape)
         lst_shape[bn_id-1] = (bn_shape, lst_shape[bn_id-1][1])
     # 这是我的模型特点，用到了 concat 结构
     lst_bn_next_layer_id = model.lst_bn_next_layer_id
@@ -101,13 +99,11 @@ def pre_prune(model, thres):
         lst_shape[bn_next_layer] = (lst_shape[bn_next_layer][0], sum([lst_shape[bn_next_cat] for bn_next_cat in lst_bn_next_cat[id]]))
 
 
-    print(len(lst_type), lst_type)
     print(len(lst_shape), lst_shape)
     pruned_ratio = float(pruned / total)
     print('\r\n!预剪枝完成!')
     print('total_pruned_ratio: ', pruned_ratio)
     eval_model(model)
-    print("lst_bn_mask : ", lst_bn_mask)
     return lst_shape, lst_bn_mask
 
 def do_prune(newmodel, model, lst_bn_mask):
@@ -124,19 +120,20 @@ def do_prune(newmodel, model, lst_bn_mask):
             bn_count += 1
             mask = lst_bn_mask[bn_count]
             dict_count_mask[count] = mask
-            print("mask : ", mask)
             idx = np.squeeze(np.argwhere(np.asarray(mask.cpu().numpy())))
             if idx.size == 1:
                 idx = np.resize(idx, (1,))
-            print("idx : ", idx)
             m1.weight.data = m0.weight.data[idx].clone()
             m1.bias.data = m0.bias.data[idx].clone()
             m1.running_mean = m0.running_mean[idx].clone()
             m1.running_var = m0.running_var[idx].clone()
             count += 1
         if isinstance(m0, nn.Conv2d):
-            print(count, "conv2d")
-            if count in lst_bn_conv2d_id[0:-1]:
+            if count in lst_bn_conv2d_id[0:-1] and count in lst_bn_next_layer_id:
+                print(count, '*******************')
+                exit(0)
+                pass
+            elif count in lst_bn_conv2d_id[0:-1]:
                 mask = lst_bn_mask[bn_count+1]
                 idx = np.squeeze(np.argwhere(np.asarray(mask.cpu().numpy())))
                 if idx.size == 1:
@@ -148,34 +145,25 @@ def do_prune(newmodel, model, lst_bn_mask):
                 for cat_id, value in enumerate(lst_bn_next_layer_id):
                     if count==value:
                         break
-                print("cat_id : ", cat_id)
                 lst_cat = lst_bn_next_cat[cat_id]
                 lst_mask = list()
                 for cat in lst_cat:
                     lst_mask.append(dict_count_mask[cat])
-                print("lst_mask : ", lst_mask)
                 mask = t.cat(lst_mask, 0)
-                print("cat_mask : ", t.cat(lst_mask, 0))
                 idx = np.squeeze(np.argwhere(np.asarray(mask.cpu().numpy())))
                 if idx.size == 1:
                     idx = np.resize(idx, (1,))
-                m1.weight.data = m0.weight.data[ :,idx, :, :].clone()
+                if m0.weight.data.shape[1]==1: # 这个地方是为了规避 depthwise conv
+                    m1.weight.data = m0.weight.data.clone()
+                else:
+                    m1.weight.data = m0.weight.data[ :,idx, :, :].clone()
                 if m0.bias is not None:
                     m1.bias.data = m0.bias.data.clone()
-                pass
             else:
                 m1.weight.data = m0.weight.data.clone()
                 if m0.bias is not None:
                     m1.bias.data = m0.bias.data.clone()
             count += 1
-            # idx0 = np.squeeze(np.argwhere(np.asarray(start_mask.cpu().numpy())))
-            # print("idx0 : ", idx0)
-            # print("m0.weight.data shape ", m0.weight.data.shape)
-            # if idx0.size == 1:
-            #     idx0 = np.resize(idx0, (1,))
-            # m1.weight.data = m0.weight.data[:, idx0, :, :].clone()
-            # m1.bias.data = m0.bias.data.clone()
-
 
 
 def main():
@@ -185,15 +173,11 @@ def main():
     for count, m in enumerate(model.modules()):
         if isinstance(m, nn.BatchNorm2d):
             total += m.weight.data.shape[0]
-            print(m.weight.data.shape)
-        # for name, params in m.named_parameters():
-        #     print(count, name)
-    print(total)
+
 
     # 确定剪枝的全局阈值
     bn = t.zeros(total)
     index = 0
-    i = 0
     for m in model.modules():
         if isinstance(m, nn.BatchNorm2d):
             size = m.weight.data.shape[0]
@@ -212,8 +196,9 @@ def main():
     lst_shape, lst_bn_mask = pre_prune(model, thre_0)
 
     # ********************************剪枝*********************************
-    newmodel = NewIRNet6(lst_shape)
+    newmodel = NewIRNet7(lst_shape)
     do_prune(newmodel, model, lst_bn_mask)
+    print("新的模型 : ", newmodel)
     eval_model(newmodel)
 
 

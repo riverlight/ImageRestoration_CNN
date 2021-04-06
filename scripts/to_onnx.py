@@ -46,10 +46,10 @@ def save_model():
 def model_test():
     device = 'cuda'
     # weights_file = '../weights/model-0310.pth'
-    weights_file = "../weights/nir6_best.pth"
-    weights_file = "../weights/pruned.pth"
-    # weights_file = "d:/nir6_test.pth"
-    image_file = 'd:/workroom/testroom/v0.png'
+    weights_file = "../weights/nir7_best.pth"
+    # weights_file = "../weights/pruned.pth"
+    # weights_file = "d:/nir7_test.pth"
+    image_file = 'd:/workroom/testroom/v360.png'
     model = torch.load(weights_file).to(device)
     model.eval()
     image = cv2.imread(image_file).astype(np.float32)
@@ -61,12 +61,13 @@ def model_test():
     cv2.imwrite(image_file.replace('.', '-ir.'), preds)
 
     print('load done')
-    input_shape = (3, 96, 96)
+    input_shape = (3, 1280, 360)
     x = torch.randn(1, *input_shape).to(device)  # 生成张量
-    export_onnx_file = "d:/nir6_best.onnx"  # 目的ONNX文件名
+    export_onnx_file = "d:/nir7_best.onnx"  # 目的ONNX文件名
     torch.onnx.export(model, x, export_onnx_file, verbose=True, do_constant_folding=True,	# 是否执行常量折叠优化
                     input_names=["input11"],	# 输入名
-                    output_names=["output44"])
+                    output_names=["output44"],
+                    dynamic_axes={'input11': {0: 'batch',2:'batch',3:'batch'}, 'output44': {0: 'batch',2:'batch',3:'batch'}})
     print("trans done")
 
 

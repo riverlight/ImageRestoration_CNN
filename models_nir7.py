@@ -15,7 +15,7 @@ class BlockDW2(nn.Module):
         self.convDW2 = nn.Conv2d(cfg[0][0], cfg[1][0], kernel_size=5, stride=1, padding=5 // 2, groups=cfg[0][0], bias=False)
         self.convPW2 = nn.Conv2d(cfg[2][1], cfg[2][0], kernel_size=1, stride=1, padding=0, bias=True)
         self.bn = nn.BatchNorm2d(cfg[3])
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         out = self.relu(self.convDW1(x))
@@ -23,21 +23,23 @@ class BlockDW2(nn.Module):
         out = self.relu(self.bn(self.convPW2(out)))
         return out
 
-
-class BlockDN(nn.Module):
+class BlockBottleNet(nn.Module):
     def __init__(self, chl_in, chl_out, kernel, expansion, cfg):
-        super(BlockDN, self).__init__()
+        super(BlockBottleNet, self).__init__()
         self.convPW1 = nn.Conv2d(cfg[0][1], cfg[0][0], kernel_size=1, stride=1)
-        self.convDW = nn.Conv2d(cfg[0][0], cfg[1][0], kernel, stride=1, padding=kernel//2, groups=cfg[0][0])
+        self.convDW = nn.Conv2d(cfg[0][0], cfg[1][0], kernel, stride=1, padding=kernel // 2, groups=cfg[0][0])
         self.convPW2 = nn.Conv2d(cfg[2][1], cfg[2][0], 1, stride=1, bias=True)
         self.bn2 = nn.BatchNorm2d(cfg[3])
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         out = self.relu(self.convPW1(x))
         out = self.relu(self.convDW(out))
-        out = self.relu(self.bn2(self.convPW2(out)))
+        out = self.bn2(self.convPW2(out))
+        out += x
+        out = self.relu(out)
         return out
+
 
 class BlockOut(nn.Module):
     def __init__(self, chl_in, chl_out, kernel, expansion, cfg):
@@ -46,7 +48,7 @@ class BlockOut(nn.Module):
         self.bn1 = nn.BatchNorm2d(cfg[1])
         self.convDW = nn.Conv2d(cfg[1], cfg[2][0], kernel_size=kernel, stride=1, padding=kernel//2, groups=cfg[1])
         self.convPW2 = nn.Conv2d(cfg[3][1], cfg[3][0], 1, 1, padding=0)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
         self.relu2 = nn.Tanh()
 
     def forward(self, x):
@@ -55,32 +57,30 @@ class BlockOut(nn.Module):
         out = self.relu2(self.convPW2(out))
         return out
 
-class NewIRNet6(nn.Module):
+class NewIRNet7(nn.Module):
     def __init__(self, cfg=None):
-        super(NewIRNet6, self).__init__()
-        self.chl_mid = 32
+        super(NewIRNet7, self).__init__()
+        self.chl_mid = 64
         self.lst_bn_layer_id = [3, 7, 11, 13]
         self.lst_bn_next_layer_id = [4, 8, 12, 14]
-        self.lst_bn_next_cat = [[3], [3, 7], [3, 7, 11], [13]]
+        self.lst_bn_next_cat = [[3], [7], [11], [13]]
         self.cfg = cfg
         if self.cfg is None:
-            self.cfg = [(32, 3), (32, 1), (32, 32), 32,
-                        (8, 32), (8, 1), (32, 8), 32,
-                        (16, 64), (16, 1), (32, 16), 32,
-                        (48, 96), 48, (48, 1), (3, 48)]
+            self.cfg = [(64, 3), (64, 1), (64, 64), 64,
+                        (16, 64), (16, 1), (64, 16), 64,
+                        (16, 64), (16, 1), (64, 16), 64,
+                        (32, 64), 32, (32, 1), (3, 32)]
 
         self.convDW9x9 = BlockDW2(3, self.chl_mid, 9, self.cfg)
-        self.dn2 = BlockDN(self.chl_mid, self.chl_mid, 3, 4, self.cfg[4:])
-        self.dn3 = BlockDN(self.chl_mid*2, self.chl_mid, 3, 4, self.cfg[8:])
-        self.blockOut4 = BlockOut(self.chl_mid*3, 3, 9, 2, self.cfg[12:])
+        self.boN2 = BlockBottleNet(self.chl_mid, self.chl_mid, 3, 4, self.cfg[4:])
+        self.boN3 = BlockBottleNet(self.chl_mid, self.chl_mid, 3, 4, self.cfg[8:])
+        self.blockOut4 = BlockOut(self.chl_mid, 3, 9, 2, self.cfg[12:])
 
     def forward(self, x):
         dw_out = self.convDW9x9(x)
-        dn2_out = self.dn2(dw_out)
-        out = t.cat([dw_out, dn2_out], 1)
-        dn3_out = self.dn3(out)
-        out = t.cat([dw_out, dn2_out, dn3_out], 1)
-        out = self.blockOut4(out)
+        bo2_out = self.boN2(dw_out)
+        bo3_out = self.boN3(bo2_out)
+        out = self.blockOut4(bo3_out)
         out = out + x
         return out
 
@@ -99,7 +99,7 @@ def test():
     device = 'cuda'
     inputs = t.rand(2, 3, 96, 64).to(device)
     targets = t.rand(2, 3, 96,64).to(device)
-    net = NewIRNet6().to(device)
+    net = NewIRNet7().to(device)
     net.train()
     optimizer = optim.Adam(params=net.parameters(), lr=1e-4, weight_decay=1e-5)
     criterion = nn.MSELoss()
@@ -110,9 +110,9 @@ def test():
     loss.backward()
 
     print(outputs.shape)
-    t.save(net, 'd:/nir6_test.pth')
-    # summary(net, input_size=(3, 96, 64), device=device)
-    updateBN(net, 0.0001)
+    t.save(net, 'd:/nir7_test.pth')
+    summary(net, input_size=(3, 960, 64), device=device)
+    # updateBN(net, 0.0001)
 
 if __name__=="__main__":
     test()

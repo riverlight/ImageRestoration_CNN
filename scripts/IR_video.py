@@ -3,25 +3,29 @@
 import os
 import sys
 sys.path.append('../')
-from models import IRResNet
+# from models import IRResNet
+from models_nir6 import *
 import cv2
 import torch as t
 import numpy as np
 import argparse
 import utils
+import time
 
 
 class CDeblock:
     def __init__(self, weights_file='./weights/best-resnet_305.pth'):
         os.chdir('../')
         self.device = t.device('cuda:0' if t.cuda.is_available() else 'cpu')
-        self.ir = IRResNet(n_blocks=3).to(self.device)
-        state_dict = self.ir.state_dict()
-        for n, p in t.load(weights_file, map_location=lambda storage, loc: storage).items():
-            if n in state_dict.keys():
-                state_dict[n].copy_(p)
-            else:
-                raise KeyError(n)
+        # self.ir = IRResNet(n_blocks=3).to(self.device)
+        # state_dict = self.ir.state_dict()
+        # for n, p in t.load(weights_file, map_location=lambda storage, loc: storage).items():
+        #     if n in state_dict.keys():
+        #         state_dict[n].copy_(p)
+        #     else:
+        #         raise KeyError(n)
+        self.ir = NewIRNet6().to(self.device)
+        self.ir = t.load("./weights/pruned.pth").to(self.device)
         self.ir.eval()
 
     def query(self, img):
@@ -40,7 +44,7 @@ class CDeblock:
 
 
 def main():
-    s_mp4 = "d:/workroom/testroom/gcw-4.mp4"
+    s_mp4 = "d:/workroom/testroom/48.mp4"
     cap = cv2.VideoCapture(s_mp4)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -50,6 +54,7 @@ def main():
     ir = CDeblock()
 
     count = 0
+    starttime = time.time()
     while True:
         if count % 25 == 0:
             print('frame id ', count)
@@ -59,6 +64,7 @@ def main():
 
         ts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
         print('ts :', ts)
+        print("cost time : ", time.time()-starttime)
         pred_img = ir.query(frame)
         # psnr = utils.calc_psnr(t.from_numpy(frame.astype(np.float32))/255, t.from_numpy(pred_img.astype(np.float32))/255)
         # print('psnr : ', psnr)
