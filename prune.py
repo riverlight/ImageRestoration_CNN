@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import torch as t
-from models_nir7 import *
+from models_nir8 import *
 import eval
 import utils
 import copy
@@ -9,9 +9,9 @@ import numpy as np
 
 device = 'cpu'
 # old_pth = "d:/nir6_test.pth"
-old_pth = "./weights/nir7_best.pth"
+old_pth = "./weights/nir8_best.pth"
 total = 0
-percent = 0.29
+percent = 0.15
 base_number = 1
 pruned_bn_num = 3
 
@@ -85,18 +85,19 @@ def pre_prune(model, thres):
             bn_count += 1
         if isinstance(m, nn.Conv2d):
             lst_type.append('Conv2d')
-            lst_shape.append((m.weight.data.shape[0], m.weight.data.shape[1]))
+            lst_shape.append((m.weight.data.shape[1], m.weight.data.shape[0]))
             layer_count += 1
+
 
     # 调整 lst_shape
     for bn_id in lst_bn_id:
         bn_shape = lst_shape[bn_id]
-        lst_shape[bn_id-1] = (bn_shape, lst_shape[bn_id-1][1])
+        lst_shape[bn_id-1] = (lst_shape[bn_id-1][0], bn_shape)
     # 这是我的模型特点，用到了 concat 结构
     lst_bn_next_layer_id = model.lst_bn_next_layer_id
     lst_bn_next_cat = model.lst_bn_next_cat
     for id, bn_next_layer in enumerate(lst_bn_next_layer_id):
-        lst_shape[bn_next_layer] = (lst_shape[bn_next_layer][0], sum([lst_shape[bn_next_cat] for bn_next_cat in lst_bn_next_cat[id]]))
+        lst_shape[bn_next_layer] = (sum([lst_shape[bn_next_cat] for bn_next_cat in lst_bn_next_cat[id]]), lst_shape[bn_next_layer][1])
 
 
     print(len(lst_shape), lst_shape)
@@ -116,6 +117,8 @@ def do_prune(newmodel, model, lst_bn_mask):
     count = 0
     bn_count = -1
     for [m0, m1] in zip(model.modules(), newmodel.modules()):
+        if isinstance(m0, nn.PReLU):
+            m1.weight.data = m0.weight.data.clone()
         if isinstance(m0, nn.BatchNorm2d):
             bn_count += 1
             mask = lst_bn_mask[bn_count]
@@ -169,7 +172,7 @@ def do_prune(newmodel, model, lst_bn_mask):
 def main():
     global total
     model = t.load(old_pth).to(device)
-    print('old model : ', model)
+    # print('old model : ', model)
     for count, m in enumerate(model.modules()):
         if isinstance(m, nn.BatchNorm2d):
             total += m.weight.data.shape[0]
@@ -196,9 +199,9 @@ def main():
     lst_shape, lst_bn_mask = pre_prune(model, thre_0)
 
     # ********************************剪枝*********************************
-    newmodel = NewIRNet7(lst_shape)
+    newmodel = NewIRNet8(lst_shape)
     do_prune(newmodel, model, lst_bn_mask)
-    print("新的模型 : ", newmodel)
+    # print("新的模型 : ", newmodel)
     eval_model(newmodel)
 
 
