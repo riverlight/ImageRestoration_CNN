@@ -4,7 +4,7 @@ from IR_dataset import IRDataset
 from torch.utils.data.dataloader import DataLoader
 import torch as t
 from utils import AverageMeter, calc_psnr
-from models_nir8 import *
+from models_nir9 import *
 from utils import AverageMeter, calc_psnr
 import os
 import torch.backends.cudnn as cudnn
@@ -16,17 +16,17 @@ def main():
     train_file = "./datasets/denoise-train.h5"
     eval_file = "./datasets/denoise-eval.h5"
     outputs_dir = "./weights/"
-    lr = 1e-4
+    lr = 2e-5
     batch_size = 24
     num_epochs = 400
     num_workers = 8
     seed = 1018
-    best_weights = './weights/nir8_epoch_34.pth'
+    best_weights = './weights/nir9_epoch_321.pth'
     # best_weights = None
-    start_epoch = 35
+    start_epoch = 322
     # 稀疏训练
-    s = 1e-5
-    sr = True # 稀疏标志 sparsity-regularization
+    s = 3e-6
+    sr = False # 稀疏标志 sparsity-regularization
 
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
@@ -36,7 +36,7 @@ def main():
     if best_weights is not None:
         model = t.load(best_weights)
     else:
-        model = NewIRNet8().to(device)
+        model = NewIRNet9().to(device)
     criterion = nn.MSELoss()
     # criterion = nn.L1Loss()
     optimizer = optim.Adam(params=model.parameters(), lr=lr)
@@ -79,7 +79,7 @@ def main():
 
                 # if i % 10 == 0:
                 print(i, epoch_losses.avg)
-        t.save(model, os.path.join(outputs_dir, 'nir8_epoch_{}.pth'.format(epoch)))
+        t.save(model, os.path.join(outputs_dir, 'nir9_epoch_{}.pth'.format(epoch)))
         model.eval()
         epoch_psnr = AverageMeter()
         for data in eval_dataloader:
@@ -98,7 +98,7 @@ def main():
         if epoch_psnr.avg > best_psnr:
             best_epoch = epoch
             best_psnr = epoch_psnr.avg
-            t.save(model, os.path.join(outputs_dir, 'nir8_best.pth'))
+            t.save(model, os.path.join(outputs_dir, 'nir9_best.pth'))
 
     print('best epoch: {}, psnr: {:.2f}'.format(best_epoch, best_psnr))
 
