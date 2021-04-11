@@ -10,7 +10,7 @@ import onnx
 import sys
 sys.path.append('../')
 from models import IRResNet, IRTestNet
-from models_nir6 import *
+from models_nir9 import *
 
 # onnx -> mnn
 """
@@ -46,9 +46,9 @@ def save_model():
 def model_test():
     device = 'cuda'
     # weights_file = '../weights/model-0310.pth'
-    weights_file = "../weights/nir7_best.pth"
+    weights_file = "../weights/nir10_best.pth"
     # weights_file = "../weights/pruned.pth"
-    # weights_file = "d:/nir7_test.pth"
+    # weights_file = "d:/nir9_test.pth"
     image_file = 'd:/workroom/testroom/v360.png'
     model = torch.load(weights_file).to(device)
     model.eval()
@@ -63,7 +63,7 @@ def model_test():
     print('load done')
     input_shape = (3, 1280, 360)
     x = torch.randn(1, *input_shape).to(device)  # 生成张量
-    export_onnx_file = "d:/nir7_best.onnx"  # 目的ONNX文件名
+    export_onnx_file = "d:/nir10_best.onnx"  # 目的ONNX文件名
     torch.onnx.export(model, x, export_onnx_file, verbose=True, do_constant_folding=True,	# 是否执行常量折叠优化
                     input_names=["input11"],	# 输入名
                     output_names=["output44"],

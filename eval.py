@@ -38,14 +38,13 @@ def main():
     print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
 
 
-def eval_image(eval_file=None):
+def eval_image(eval_file=None, device='cuda'):
     image_file = "sample/q10/he-test0-q10.jpg"
     out_file = image_file.replace('.', '-nir.')
     if eval_file is None:
         # eval_file = "./weights/ir-0310.pth"
         # eval_file = "./weights/nir3-backup/nir3_epoch_396.pth"
         eval_file = "./weights/nir7_best.pth"
-    device = 'cuda'
     net = t.load(eval_file)
     net = net.to(device)
     net.eval()
@@ -65,11 +64,11 @@ def eval_image(eval_file=None):
 def find_best():
     best_psnr = 0
     best_id = -1
-    for i in range(0, 272):
+    for i in range(0, 400):
         ref_file = "sample/q10/he-test0.jpg"
         image_file = "sample/q10/he-test0-q10.jpg"
         ir_file = image_file.replace('.', '-nir.')
-        weights_file = "./weights/nir7_epoch_{}.pth".format(i)
+        weights_file = "./weights/nir10_epoch_{}.pth".format(i)
         # print(weights_file)
         eval_image(eval_file=weights_file)
         img0 = t.from_numpy(cv2.imread(ref_file).astype(np.float32)) / 255.0
